@@ -1,0 +1,33 @@
+"0","pacman::p_load(knitr, kableExtra, gridExtra, caret, corrplot, lattice, ggplot2, dplyr, cookbook)
+"
+"2","Installing package into ‘C:/Users/gwest/OneDrive/Documenten/R/win-library/3.6’
+(as ‘lib’ is unspecified)
+"
+"2","cannot open URL 'http://www.stats.ox.ac.uk/pub/RWin/src/contrib/PACKAGES.rds': HTTP status was '404 Not Found'"
+"2","package ‘cookbook’ is not available (for R version 3.6.1)"
+"2","cannot open URL 'http://www.stats.ox.ac.uk/pub/RWin/bin/windows/contrib/3.6/PACKAGES.rds': HTTP status was '404 Not Found'"
+"2","cannot open URL 'http://www.stats.ox.ac.uk/pub/RWin/bin/windows/contrib/3.6/PACKAGES.gz': HTTP status was '404 Not Found'"
+"2","cannot open URL 'http://www.stats.ox.ac.uk/pub/RWin/bin/windows/contrib/3.6/PACKAGES': HTTP status was '404 Not Found'"
+"2","unable to access index for repository http://www.stats.ox.ac.uk/pub/RWin/bin/windows/contrib/3.6:
+  cannot open URL 'http://www.stats.ox.ac.uk/pub/RWin/bin/windows/contrib/3.6/PACKAGES'"
+"2","trying URL 'https://bioconductor.org/packages/3.10/bioc/bin/windows/contrib/3.6/BiocVersion_3.10.1.zip'
+"
+"2","Content type 'application/zip'"
+"2"," length 8903 bytes
+"
+"2","downloaded 8903 bytes
+
+"
+"1","package â€˜BiocVersionâ€™ successfully unpacked and MD5 sums checked
+"
+"1","
+"
+"1",""
+"1","The downloaded binary packages are in
+	C:\Users\gwest\AppData\Local\Temp\Rtmp8E9tCC\downloaded_packages"
+"1",""
+"1","
+"
+"2","there is no package called ‘cookbook’"
+"2","Failed to install/load:
+cookbook"

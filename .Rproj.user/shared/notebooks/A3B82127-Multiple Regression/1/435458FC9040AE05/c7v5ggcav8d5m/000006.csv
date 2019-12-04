@@ -1,0 +1,4 @@
+"0","ggplot(df, aes(x = Algorithm,y = Rsquared, coulour = Dataset) + geom_line())
+"
+"2","Error: Mapping should be created with `aes() or `aes_()`.
+"

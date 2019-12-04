@@ -1,0 +1,5 @@
+"0","corrData<- cor(readyData) %>% arrange(desc(Volume))
+"
+"2","Error in UseMethod(""arrange_"") : 
+  no applicable method for 'arrange_' applied to an object of class ""c('matrix', 'double', 'numeric')""
+"

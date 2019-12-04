@@ -1,0 +1,7 @@
+"0","ggplot(training, aes(x = Volume, y = predictedVol.)) +"
+"0","  geom_point(aes(color = (abs(resid) > 100))) +"
+"0","  # geom_smooth(method = lm) +"
+"0","  geom_abline(slope = 1, intercept = 0) +"
+"0","  labs(title = ""Error"") +"
+"0","  scale_color_manual(values = c(""blue"",""red"")) +"
+"0","  theme(legend.position=""none"")"

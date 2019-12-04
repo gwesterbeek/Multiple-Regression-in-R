@@ -1,0 +1,5 @@
+"0","df$Knn <- metricsKnn[[2]] 
+"
+"2","Error in df$Knn <- metricsKnn[[2]] : 
+  object of type 'closure' is not subsettable
+"

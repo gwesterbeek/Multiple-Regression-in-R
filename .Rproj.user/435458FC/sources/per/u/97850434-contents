@@ -1,0 +1,237 @@
+install.packages("corrplot")
+library(corrplot)
+library(caret)
+library(lattice)
+library(ggplot2)
+library(dplyr)
+
+Dataset<- read.csv("existingproductattributes2017.csv")
+str(Dataset)
+# dummify the data####
+newDataFrame<- dummyVars("~ .", data = Dataset)
+readyData<- data.frame(predict(newDataFrame, newdata = Dataset))
+str(readyData)
+summary(readyData)
+
+# delete attribute "BestSellersRank"#### 
+readyData$BestSellersRank<- NULL
+
+# Correlation matrix####
+
+corrData<- cor(readyData)
+corrData
+corrplot(corrData, method = "color", type = "lower", tl.cex = 0.5, 
+         addCoef.col = "white", number.cex = 0.4,
+         outline = T, order="hclust")
+
+# create final dataset####  
+
+FinalData1<- select(readyData, -1:-4, -8:-9, -11:-15,-17,-19, -21:-27)
+FinalData<- filter(FinalData1,PositiveServiceReview < 400 & 
+              x4StarReviews <400 & x2StarReviews <300 & Volume != 1576 & Volume != 2140)
+
+
+# Boxplot for finding outliers####
+
+ggplot(data = FinalData,aes(y=x2StarReviews))+geom_boxplot()
+ggplot(data = FinalData,aes(y=x4StarReviews))+geom_boxplot()
+ggplot(data = FinalData,aes(y=PositiveServiceReview))+geom_boxplot()
+ggplot(data = FinalData,aes(y=NegativeServiceReview))+geom_boxplot()
+
+#Create knn model####
+
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.75,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+knnFit <- train(Volume ~ .,  
+                 data = training,
+                 method = "knn",  
+                 trControl = ctrl) 
+
+summary(knnFit)
+
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(knnFit, newdata = training)  
+postResample(training$Volume, train_results)
+
+train_results
+### Results on test 
+test_results <- predict(knnFit, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+
+
+
+#Create RF model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.75,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+RFFit <- train(Volume ~ .,  
+                data = training,
+                method = "rf",  
+                trControl = ctrl) 
+RFFit
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(RFFit, newdata = training)  
+postResample(training$Volume, train_results)
+
+### Results on test 
+test_results <- predict(RFFit, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+#Create svm model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.75,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+svmFit <- train(Volume ~ .,  
+               data = training,
+               method = "svmLinear2",  
+               trControl = ctrl) 
+svmFit
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(svmFit, newdata = training)  
+postResample(training$Volume, train_results)
+
+### Results on test 
+test_results <- predict(svmFit, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+# visualization of the errors####
+testing$predictedVol.<- test_results
+testing$resid <- testing$Volume - testing$predictedVol.
+
+
+
+ggplot(testing, aes(x = Volume, y = predictedVol.)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  # geom_smooth(method = lm) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+
+
+ggplot(testing, aes(x = predictedVol., y = x2StarReviews)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  geom_smooth(method = lm) +
+  # geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+
+
+
+#2nd modalisation####
+#Create knn model####
+
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1)
+
+
+knnFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+                data = training,
+                method = "knn", 
+                tunelenght = 15,
+                trControl = ctrl) 
+
+knnFit1
+
+
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(knnFit1, newdata = training)  
+postResample(training$Volume, train_results)
+
+train_results
+### Results on test 
+test_results <- predict(knnFit1, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+
+#Create RF model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+RFFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+               data = training,
+               method = "rf",  
+               trControl = ctrl) 
+RFFit1
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(RFFit1, newdata = training)  
+postResample(training$Volume, train_results)
+
+### Results on test 
+test_results <- predict(RFFit1, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+
+#Create svm model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+svmFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+                data = training,
+                method = "svmLinear2",  
+                trControl = ctrl) 
+svmFit1
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(svmFit1, newdata = training)  
+postResample(training$Volume, train_results)
+
+### Results on test 
+test_results <- predict(svmFit1, newdata = testing)  
+postResample(testing$Volume, test_results)

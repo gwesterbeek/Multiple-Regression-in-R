@@ -1,0 +1,2 @@
+"0","training$predictedVol.<- train_results_knnFit1"
+"0","training$resid <- training$Volume - training$predictedVol."

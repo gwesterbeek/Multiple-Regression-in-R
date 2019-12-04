@@ -1,0 +1,278 @@
+---
+title: "Multiple Regression Report"
+author: "Gerhard Westerbeek"
+date: "21-11-2019"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# libraries to use
+
+if(require(pacman) == FALSE){
+
+  install.packages("pacman")
+
+}
+
+
+
+pacman::p_load(knitr, kableExtra, gridExtra, caret, corrplot, lattice, ggplot2, dplyr, cookbook)
+
+```
+
+
+## Defining the problem {.smaller}
+
+Analyze historical sales data and then make sales volume predictions for a list of new product types. This will help the sales team better understand how types of products might impact sales across the enterprise
+
+
+
+Our work in that task would be:
+
+
+1. Predicting sales of four different product types: PC, Laptops, Netbooks and Smartphones
+
+
+
+2. Assessing the impact services reviews and customer reviews have on sales of different product types
+
+## Import the data {.smaller}
+
+```{r import the data}
+Dataset<- read.csv("existingproductattributes2017.csv")
+```
+
+
+```{r understanding the data we have, echo=TRUE, message=F}
+str(Dataset)
+```
+
+
+## Data wrangling {.smaller}
+```{r echo=TRUE}
+#Dumify the data
+newDataFrame<- dummyVars("~ .", data = Dataset)
+readyData<- data.frame(predict(newDataFrame, newdata = Dataset))
+# delete attribute "BestSellersRank"#### 
+readyData$BestSellersRank<- NULL
+# let's check the structure of the dataset
+str(readyData)
+```
+
+## Correlation matrix 
+```{r echo=TRUE}
+library("corrplot")
+corrData<- cor(readyData) %>% arrange(desc(Volume))
+
+corrplot(corrData, method = "color", type = "lower", tl.cex = 0.5, 
+         addCoef.col = "white", number.cex = 0.4,
+         outline = T, order="hclust")
+```
+
+# Boxplot for finding outliers 2StarReviews
+
+```{r echo=TRUE}
+ggplot(data = readyData,aes(y=x2StarReviews))+geom_boxplot()
+```
+
+# Boxplot for finding outliers 4StarReviews
+```{r echo=TRUE}
+ggplot(data = readyData,aes(y=x4StarReviews))+geom_boxplot()
+```
+
+# Boxplot for finding outliers PositiveServiceReview
+```{r echo=TRUE}
+ggplot(data = readyData,aes(y=PositiveServiceReview))+geom_boxplot()
+```
+
+## Preparing final dataset for models
+```{r echo = TRUE}
+#Filter out the atrributes based on correlation matrix;
+FinalData1<- select(readyData, -1:-4, -8:-9, -11:-15,-17,-19, -21:-27)
+#Filter out the outliers of the predictors;
+FinalData<- filter(FinalData1,PositiveServiceReview < 400 & 
+              x4StarReviews <400 & x2StarReviews <300)
+str(FinalData)
+```
+
+## Preparing Random Forest Model
+```{r echo = TRUE}
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+RFFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+               data = training,
+               method = "rf",  
+               trControl = ctrl) 
+RFFit1
+```
+
+## 1st error check Random Forest 
+*Error check on trainingset and testset;*
+```{r echo = TRUE}
+train_results_RFFit1 <- predict(RFFit1, newdata = training)  
+postResample(training$Volume, train_results_RFFit1)
+test_results_RFFit1 <- predict(RFFit1, newdata = testing)  
+postResample(testing$Volume, test_results_RFFit1)
+```
+
+## Residual >100 for Random Forest Model
+```{r echo = TRUE}
+training$predictedVol.<- train_results_RFFit1
+training$resid <- training$Volume - training$predictedVol.
+```
+
+```{r echo = FALSE}
+ggplot(training, aes(x = Volume, y = predictedVol.)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  # geom_smooth(method = lm) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+``` 
+
+## Preparing knn Model
+```{r echo = TRUE}
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+knnFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+               data = training,
+               method = "knn",  
+               trControl = ctrl) 
+knnFit1
+```
+
+## 1st error check knn
+*Error check on trainingset and testset;*
+```{r echo = TRUE}
+train_results_knnFit1 <- predict(knnFit1, newdata = training)  
+postResample(training$Volume, train_results_knnFit1)
+test_results_knnFit1 <- predict(knnFit1, newdata = testing)  
+postResample(testing$Volume, test_results_knnFit1)
+```
+
+## Residual >100 for knn Model
+```{r echo = TRUE}
+training$predictedVol.<- train_results_knnFit1
+training$resid <- training$Volume - training$predictedVol.
+```
+
+```{r echo = FALSE}
+ggplot(training, aes(x = Volume, y = predictedVol.)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  # geom_smooth(method = lm) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+``` 
+## Preparing svmModel
+```{r echo = TRUE}
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+svmFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+               data = training,
+               method = "svmLinear2",  
+               trControl = ctrl) 
+svmFit1
+```
+
+## 1st error check svm
+*Error check on trainingset and testset;*
+```{r echo = TRUE}
+train_results_svmFit1 <- predict(svmFit1, newdata = training)  
+postResample(training$Volume, train_results_svmFit1)
+test_results_svmFit1 <- predict(svmFit1, newdata = testing)  
+postResample(testing$Volume, test_results_svmFit1)
+```
+
+## Residual >100 for svm Model
+```{r echo = TRUE}
+training$predictedVol.<- train_results_svmFit1
+training$resid <- training$Volume - training$predictedVol.
+```
+
+```{r echo = FALSE}
+ggplot(training, aes(x = Volume, y = predictedVol.)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  # geom_smooth(method = lm) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+```
+
+```{r echo=FALSE}
+metricsKnn <- postResample(training$Volume, train_results_knnFit1)
+metricsSvm <- postResample(training$Volume, train_results_svmFit1)
+metricsRF <- postResample(training$Volume, train_results_RFFit1)
+metricsKnn1 <- postResample(testing$Volume, test_results_knnFit1)
+metricsSvm1 <- postResample(testing$Volume, test_results_svmFit1)
+metricsRF1 <- postResample(testing$Volume, test_results_RFFit1)
+
+df <- data.frame(Rsquared = c(metricsKnn[[2]], metricsSvm[[2]],metricsRF[[2]],metricsKnn1[[2]], metricsSvm1[[2]],metricsRF1[[2]]), 
+      Algorithm = c("Knn", "SVM", "RF","Knn","SVM","RF"),           
+      DataSet = c("Training","Training", "Training",
+                  "Testing","Testing","Testing") )
+```
+
+## Overview Rsquared scores 
+```{r echo=TRUE}
+ggplot(df, aes(x = Algorithm, y = Rsquared, colour = DataSet)) + geom_line(aes(group = DataSet ))
+```
+
+##Import Data new attributes
+```{r echo=FALSE}
+NewProduct<- read.csv("newproductattributes2017.csv")
+
+#dummify the data
+NewProductFrame<- dummyVars("~ .", data = NewProduct)
+NewFinal<- data.frame(predict(NewProductFrame, newdata = NewProduct))
+
+NewFinal1<- select(NewFinal, -1:-4, -8:-9, -11:-15,-17,-19, -21:-28)
+
+
+Prediction_results<- predict(RFFit1, newdata = NewFinal1)
+NewFinal1$predictedVol.<- Prediction_results
+```
+
+##Overview total Salesvolume 
+
+```{r echo=FALSE}
+DF_Final <- NewFinal1 %>% select(ProductType.Laptop, ProductType.Netbook, 
+                     ProductType.PC, ProductType.Smartphone, 
+                     predictedVol.) %>% 
+              mutate(Laptop=ProductType.Laptop * predictedVol., 
+                     Netbook=ProductType.Netbook * predictedVol.,
+                     PC=ProductType.PC * predictedVol., 
+                     Smartphone=ProductType.Smartphone*predictedVol.) %>%
+              summarise(Total_Laptop=sum(Laptop), 
+                        Total_Netbook=sum(Netbook),
+                        Total_PC=sum(PC),
+                        Total_Smartphone=sum(Smartphone)) 
+DF_Final %>% 
+  mutate(Total_Laptop = paste("$",round(Total_Laptop, 2), sep = ""))
+ ```
+

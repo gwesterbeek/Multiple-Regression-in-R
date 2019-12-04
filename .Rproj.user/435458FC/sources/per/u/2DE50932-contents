@@ -1,0 +1,31 @@
+temp <- as_tibble(iris)
+
+temp_num <- temp %>% 
+  select(-Species) 
+
+ 
+
+cor_matrix <- cor(temp_num)
+
+cor_df <- as_tibble(cor_matrix)
+cor_df %>% 
+  mutate(corr_var = row.names(cor_matrix)) %>% 
+  select(Petal.Width, corr_var) %>% 
+  arrange(desc(Petal.Width))
+
+#################
+readyData1 <- as_tibble(readyData)
+corrData<- cor(readyData1)
+
+Corr_df <- as_tibble(corrData)
+dim(Corr_df)
+
+Corr_df %>% 
+  mutate(corr_var = row.names(corrData)) %>% 
+  select(Volume, corr_var) %>% 
+  arrange(desc(Volume))
+
+corrplot(as.matrix(Corr_df), method = "color", type = "lower", tl.cex = 0.5, 
+         addCoef.col = "white", number.cex = 0.4,
+         outline = T, order = "AOE")
+

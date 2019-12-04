@@ -1,0 +1,317 @@
+install.packages("corrplot")
+install.packages("tidyverse")
+library(corrplot)
+library(caret)
+library(lattice)
+library(ggplot2)
+library(dplyr)
+library(rmarkdown)
+library(tible)
+
+Dataset<- read.csv("existingproductattributes2017.csv")
+str(Dataset)
+
+# dummify the data####
+newDataFrame<- dummyVars("~ .", data = Dataset)
+readyData<- data.frame(predict(newDataFrame, newdata = Dataset))
+str(readyData)
+summary(readyData)
+
+# delete attribute "BestSellersRank"#### 
+readyData$BestSellersRank<- NULL
+
+# Correlation matrix####
+
+corrData<- cor(readyData)
+
+corrData
+corrplot(corrData, method = "color", type = "lower", tl.cex = 0.5, 
+         addCoef.col = "white", number.cex = 0.4,
+         outline = T, order="hclust")
+
+# create final dataset####  
+
+FinalData1<- select(readyData, -1:-4, -8:-9, -11:-15,-17,-19, -21:-27)
+FinalData<- filter(FinalData1,PositiveServiceReview < 400 & 
+              x4StarReviews <400 & x2StarReviews <300 & 
+                #Volume != 1576 & Volume != 2140)
+
+
+# Boxplot for finding outliers####
+
+ggplot(data = FinalData,aes(y=x2StarReviews))+geom_boxplot()
+ggplot(data = FinalData,aes(y=x4StarReviews))+geom_boxplot()
+ggplot(data = FinalData,aes(y=PositiveServiceReview))+geom_boxplot()
+ggplot(data = FinalData,aes(y=NegativeServiceReview))+geom_boxplot()
+
+#Create knn model####
+
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.75,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+knnFit <- train(Volume ~ .,  
+                 data = training,
+                 method = "knn",  
+                 trControl = ctrl) 
+                
+summary(knnFit)
+
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(knnFit, newdata = training)  
+postResample(training$Volume, train_results)
+
+train_results
+### Results on test 
+test_results <- predict(knnFit, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+
+
+
+#Create RF model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.75,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+RFFit <- train(Volume ~ .,  
+                data = training,
+                method = "rf",  
+                trControl = ctrl) 
+RFFit
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(RFFit, newdata = training)  
+postResample(training$Volume, train_results)
+
+### Results on test 
+test_results <- predict(RFFit, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+#Create svm model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.75,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+svmFit <- train(Volume ~ .,  
+               data = training,
+               method = "svmLinear2",  
+               trControl = ctrl) 
+svmFit
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results <- predict(svmFit, newdata = training)  
+postResample(training$Volume, train_results)
+
+### Results on test 
+test_results <- predict(svmFit, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+# visualization of the errors####
+testing$predictedVol.<- test_results
+testing$resid <- testing$Volume - testing$predictedVol.
+
+
+
+ggplot(testing, aes(x = Volume, y = predictedVol.)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  # geom_smooth(method = lm) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+
+
+ggplot(testing, aes(x = predictedVol., y = x2StarReviews)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  geom_smooth(method = lm) +
+  # geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+
+
+
+#2nd modalisation####
+#Create knn model####
+
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1)
+
+
+knnFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+                data = training,
+                method = "knn", 
+                tunelenght = 15,
+                trControl = ctrl,
+                preProcess = c("center","scale")) 
+
+knnFit1
+
+
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results_knnFit1 <- predict(knnFit1, newdata = training)  
+postResample(training$Volume, train_results)
+
+testing$predictedVol.<- test_results
+testing$resid <- testing$Volume - testing$predictedVol.
+
+train_results
+### Results on test 
+test_results_knnFit1 <- predict(knnFit1, newdata = testing)  
+postResample(testing$Volume, test_results_knnFit1)
+
+
+#Create RF model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+RFFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+               data = training,
+               method = "rf",  
+               trControl = ctrl) 
+RFFit1
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results_RFFit1 <- predict(RFFit1, newdata = training)  
+postResample(training$Volume, train_results_RFFit1)
+
+training$predictedVol.<- train_results_RFFit1
+training$resid <- training$Volume - training$predictedVol.
+
+ggplot(training, aes(x = Volume, y = predictedVol.)) +
+  geom_point(aes(color = (abs(resid) > 100))) +
+  # geom_smooth(method = lm) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Error") +
+  scale_color_manual(values = c("blue","red")) +
+  theme(legend.position="none")
+
+### Results on test 
+test_results_RFFit1 <- predict(RFFit1, newdata = testing)  
+postResample(testing$Volume, test_results)
+
+
+#Create svm model####
+set.seed(123)
+inTrain <- createDataPartition(y = FinalData$Volume, p=.65,
+                               list=FALSE)  
+training <- FinalData[ inTrain,] 
+testing <- FinalData[-inTrain,]
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 1) 
+
+svmFit1 <- train(Volume ~ x4StarReviews + x2StarReviews + PositiveServiceReview,  
+                data = training,
+                method = "svmLinear2",  
+                trControl = ctrl) 
+svmFit1
+
+
+## 1st error check: RMSE and Rsquared
+
+### Results on train
+train_results_svmFit1 <- predict(svmFit1, newdata = training)  
+postResample(training$Volume, train_results_svmFit1)
+
+#Newproductattributes with RF-model####
+NewProduct<- read.csv("newproductattributes2017.csv")
+str(NewProduct)
+# dummify the data####
+NewProductFrame<- dummyVars("~ .", data = NewProduct)
+NewFinal<- data.frame(predict(NewProductFrame, newdata = NewProduct))
+str(NewFinal)
+summary(NewFinal)
+
+NewFinal1<- select(NewFinal, -1:-4, -8:-9, -11:-15,-17,-19, -21:-28)
+
+Prediction_results<- predict(RFFit1, newdata = NewFinal1)
+NewFinal1$predictedVol.<- Prediction_results
+
+write.csv(NewFinal1,file = "NewProductVolume.csv")
+
+
+# Results on test ####
+test_results_svmFit1 <- predict(svmFit1, newdata = testing)  
+postResample(testing$Volume, test_results_svmFit1)
+
+results <- resamples(list(svm = svmFit1,rf = RFFit1,
+                          knn=knnFit1))
+results
+summary(results)
+bwplot(results)
+dotplot(results)
+
+# Calculate Relative Importance for Each Predictor
+install.packages("relaimpo")
+library(relaimpo)
+calc.relimp(RFFit1, b = 100, type=c("x4StarReviews","x2StarReviews",
+            "PositiveServiceReview"),rela=TRUE)
+
+# Bootstrap Measures of Relative Importance (1000 samples) 
+boot <- boot.relimp(fit, b = 1000, type = c("lmg", 
+                                            "last", "first", "pratt"), rank = TRUE, 
+                    diff = TRUE, rela = TRUE)
+booteval.relimp(boot) # print result
+plot(booteval.relimp(boot,sort=TRUE)) # plot result 
+
+install.packages("rsq")
+library("rsq")
+rsq(RFFit1, model=TRUE)
+anova(RFFit, knnFit1)
+
+
+
+NewFinal1 %>% select(ProductType.Laptop, ProductType.Netbook, 
+                     ProductType.PC, ProductType.Smartphone, predictedVol.) %>% 
+              mutate(Laptop=ProductType.Laptop * predictedVol.,round(Laptop, 1),
+                     Netbook=ProductType.Netbook * predictedVol.,
+                     PC=ProductType.PC * predictedVol., 
+                     Smartphone=ProductType.Smartphone*predictedVol.) %>%
+              summarise(Total_Laptop=sum(Laptop), 
+                        Total_Netbook=sum(Netbook),
+                        Total_PC=sum(PC),
+                        Total_Smartphone=sum(Smartphone)  
+                        ) 
+
+ggplot(NewFinal1, aes(Total_Laptop) + geom_bar())
+
